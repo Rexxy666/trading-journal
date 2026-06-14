@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美股交易日誌</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: #0f172a;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    input, select, textarea {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      border-radius: 8px;
+      padding: 9px 12px;
+      width: 100%;
+      outline: none;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px #3b82f620; }
+    input::placeholder, textarea::placeholder { color: #475569; }
+    select option { background: #1e293b; }
+    button { font-family: inherit; cursor: pointer; }
+    table { border-collapse: collapse; }
+    .nav-btn { transition: background 0.15s, color 0.15s; }
+    .nav-btn:hover { background: #334155 !important; }
+    .action-btn { transition: opacity 0.15s; }
+    .action-btn:hover { opacity: 0.8; }
+    .trade-row { transition: background 0.1s; }
+    .trade-row:hover { background: #1e293b !important; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.2s ease; }
+    @media (max-width: 768px) {
+      .sidebar { width: 64px !important; }
+      .sidebar .nav-label, .sidebar .logo-text, .sidebar .storage-note { display: none !important; }
+      .main-content { margin-left: 64px !important; }
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ===================== UTILITIES ===================== */
+const genId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+const fmt$ = (n) => {
+  if (n == null) return '—';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  return `${sign}$${abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const fmtPnL = (n) => {
+  if (n == null) return '—';
+  return `${n >= 0 ? '+' : ''}${fmt$(n)}`;
+};
+
+const today = () => new Date().toISOString().split('T')[0];
+
+const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ===================== REAL TRADE DATA (from Firstrade) ===================== */
+const SAMPLE = [
+  /* ========== OPTION TRADES — 2025 NVDA Covered Calls & CSPs ========== */
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:175, expiry:'2025-09-19', contracts:1,
+    entryPremium:2.87, exitPremium:0.86, openDate:'2025-09-04', closeDate:'2025-09-19', pnl:201,
+    notes:'Covered call on NVDA. Bought back before expiry for profit.', tags:['covered-call'], createdAt:'2025-09-04' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:180, expiry:'2025-10-03', contracts:1,
+    entryPremium:2.74, exitPremium:0, openDate:'2025-09-19', closeDate:'2025-10-03', pnl:274,
+    notes:'Covered call, ASSIGNED — 100 NVDA called away at $180.', tags:['covered-call','assigned'], createdAt:'2025-09-19' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'put', strike:190, expiry:'2025-10-31', contracts:1,
+    entryPremium:3.64, exitPremium:0.30, openDate:'2025-10-27', closeDate:'2025-10-29', pnl:334,
+    notes:'Cash-secured put. Bought back near expiry for near-max profit.', tags:['csp'], createdAt:'2025-10-27' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:190, expiry:'2025-10-17', contracts:1,
+    entryPremium:3.30, exitPremium:7.45, openDate:'2025-10-06', closeDate:'2025-10-09', pnl:-415,
+    notes:'Covered call, NVDA ran higher. Had to buy back at a loss.', tags:['covered-call'], createdAt:'2025-10-06' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:195, expiry:'2025-10-17', contracts:1,
+    entryPremium:4.35, exitPremium:0.23, openDate:'2025-10-09', closeDate:'2025-10-14', pnl:412,
+    notes:'Covered call. Bought back near expiry for profit.', tags:['covered-call'], createdAt:'2025-10-09' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:185, expiry:'2025-10-24', contracts:1,
+    entryPremium:3.05, exitPremium:0, openDate:'2025-10-17', closeDate:'2025-10-24', pnl:305,
+    notes:'Covered call, ASSIGNED — 100 NVDA called away at $185.', tags:['covered-call','assigned'], createdAt:'2025-10-17' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'put', strike:207.5, expiry:'2025-10-31', contracts:1,
+    entryPremium:2.96, exitPremium:0, openDate:'2025-10-29', closeDate:'2025-10-31', pnl:296,
+    notes:'Cash-secured put, ASSIGNED — bought 100 NVDA at $207.50. Premium kept.', tags:['csp','assigned'], createdAt:'2025-10-29' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:212.5, expiry:'2025-11-07', contracts:1,
+    entryPremium:2.48, exitPremium:0.02, openDate:'2025-11-03', closeDate:'2025-11-06', pnl:246,
+    notes:'Covered call. Bought back near zero for max profit.', tags:['covered-call'], createdAt:'2025-11-03' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:197.5, expiry:'2025-11-21', contracts:1,
+    entryPremium:4.45, exitPremium:2.82, openDate:'2025-11-14', closeDate:'2025-11-17', pnl:163,
+    notes:'Covered call. Rolled up to higher strike after buyback.', tags:['covered-call'], createdAt:'2025-11-14' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:202.5, expiry:'2025-11-21', contracts:1,
+    entryPremium:2.01, exitPremium:1.40, openDate:'2025-11-17', closeDate:'2025-11-18', pnl:61,
+    notes:'Covered call after rolling up from 197.5. Small profit.', tags:['covered-call'], createdAt:'2025-11-17' },
+
+  /* ========== OPTION TRADES — 2026 NVDA Covered Calls ========== */
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:185, expiry:'2026-01-16', contracts:1,
+    entryPremium:0.83, exitPremium:2.75, openDate:'2026-01-14', closeDate:'2026-01-16', pnl:-192,
+    notes:'Covered call (post-split ADJ 10:1). Had to buy back at a loss as NVDA held above strike.', tags:['covered-call'], createdAt:'2026-01-14' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:195, expiry:'2026-02-06', contracts:1,
+    entryPremium:1.32, exitPremium:1.41, openDate:'2026-01-21', closeDate:'2026-01-21', pnl:-9,
+    notes:'Covered call, bought back same day at slight loss. Roll attempt.', tags:['covered-call'], createdAt:'2026-01-21' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:195, expiry:'2026-02-06', contracts:1,
+    entryPremium:1.89, exitPremium:0.16, openDate:'2026-01-22', closeDate:'2026-02-03', pnl:173,
+    notes:'Covered call re-opened after roll. Profit.', tags:['covered-call'], createdAt:'2026-01-22' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:200, expiry:'2026-02-27', contracts:1,
+    entryPremium:3.10, exitPremium:2.09, openDate:'2026-02-06', closeDate:'2026-02-13', pnl:101,
+    notes:'Covered call. Profit.', tags:['covered-call'], createdAt:'2026-02-06' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:190, expiry:'2026-02-27', contracts:1,
+    entryPremium:5.20, exitPremium:10.30, openDate:'2026-02-13', closeDate:'2026-02-25', pnl:-510,
+    notes:'Covered call, NVDA surged after rolling down. Big loss on buyback. NVDA strength underestimated.', tags:['covered-call'], createdAt:'2026-02-13' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:185, expiry:'2026-03-13', contracts:1,
+    entryPremium:1.64, exitPremium:0.24, openDate:'2026-03-09', closeDate:'2026-03-13', pnl:140,
+    notes:'Covered call. Profit.', tags:['covered-call'], createdAt:'2026-03-09' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:182.5, expiry:'2026-03-27', contracts:1,
+    entryPremium:0.93, exitPremium:0.05, openDate:'2026-03-23', closeDate:'2026-03-26', pnl:88,
+    notes:'Covered call. Bought back near zero, near-max profit.', tags:['covered-call'], createdAt:'2026-03-23' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:175, expiry:'2026-04-01', contracts:1,
+    entryPremium:0.38, exitPremium:1.19, openDate:'2026-03-31', closeDate:'2026-04-01', pnl:-81,
+    notes:'Covered call. Had to buy back at a loss.', tags:['covered-call'], createdAt:'2026-03-31' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:175, expiry:'2026-04-10', contracts:1,
+    entryPremium:2.45, exitPremium:9.30, openDate:'2026-04-02', closeDate:'2026-04-08', pnl:-685,
+    notes:'Covered call. NVDA bounced hard after tariff selloff relief. Large loss on buyback.', tags:['covered-call'], createdAt:'2026-04-02' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:205, expiry:'2026-05-08', contracts:1,
+    entryPremium:0.53, exitPremium:10.67, openDate:'2026-04-09', closeDate:'2026-05-08', pnl:-1014,
+    notes:'Covered call. NVDA surged strongly driven by AI demand. Forced to buy back at massive loss.', tags:['covered-call'], createdAt:'2026-04-09' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:215, expiry:'2026-05-08', contracts:1,
+    entryPremium:1.41, exitPremium:0, openDate:'2026-05-08', closeDate:'2026-05-08', pnl:141,
+    notes:'Covered call, ASSIGNED — 100 NVDA called away at $215. Premium kept.', tags:['covered-call','assigned'], createdAt:'2026-05-08' },
+
+  /* ========== OTHER OPTIONS ========== */
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'put', strike:217.5, expiry:'2026-05-26', contracts:1,
+    entryPremium:5.10, exitPremium:3.15, openDate:'2026-05-15', closeDate:'2026-05-26', pnl:-195,
+    notes:'Long put hedge on NVDA. NVDA held up well, sold at loss.', tags:['long-put','hedge'], createdAt:'2026-05-15' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'GLW', optionType:'put', strike:180, expiry:'2026-06-05', contracts:1,
+    entryPremium:6.35, exitPremium:0.53, openDate:'2026-05-29', closeDate:'2026-06-03', pnl:582,
+    notes:'Cash-secured put on Corning (GLW). Bought back near expiry for near-max profit.', tags:['csp'], createdAt:'2026-05-29' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'ADBE', optionType:'call', strike:245, expiry:'2026-06-12', contracts:1,
+    entryPremium:7.55, exitPremium:0.01, openDate:'2026-06-10', closeDate:'2026-06-12', pnl:754,
+    notes:'Covered call on ADBE. Expired near worthless — max profit captured.', tags:['covered-call'], createdAt:'2026-06-10' },
+
+  /* Open Options */
+  { id:genId(), type:'option', status:'closed', ticker:'ADBE', optionType:'call', strike:202.5, expiry:'2026-06-12', contracts:1,
+    entryPremium:2.00, exitPremium:0, openDate:'2026-06-12', closeDate:'2026-06-12', pnl:200,
+    notes:'Covered call, ASSIGNED — 100 ADBE called away at $202.50. Premium $200 kept.', tags:['covered-call','assigned'], createdAt:'2026-06-12' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:125, expiry:'2026-09-18', contracts:1,
+    entryPremium:12.42, exitPremium:null, openDate:'2026-06-12', closeDate:null, pnl:0,
+    notes:'Long put on PLTR. Opened 6/12/2026.', tags:['long-put'], createdAt:'2026-06-12' },
+
+  /* ========== STOCK TRADES ========== */
+  /* NVDA Round 1: Long → Called away at $180 */
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:100, entryPrice:170.46, exitPrice:180.00, entryDate:'2025-09-02', exitDate:'2025-10-03',
+    pnl:954, notes:'Long NVDA (100 sh @170.46). Called away at $180 via covered call assignment (NVDA 10/3 180C).', tags:['covered-call','assignment'], createdAt:'2025-09-02' },
+
+  /* NVDA Round 2: Long (avg $183.76) → Called away at $185 */
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:100, entryPrice:183.76, exitPrice:185.00, entryDate:'2025-09-05', exitDate:'2025-10-24',
+    pnl:124, notes:'Long NVDA: 10sh @$166.46 (9/5) + 90sh @$185.68 (10/6), avg ~$183.76. Called away at $185 via covered call assignment (NVDA 10/24 185C).', tags:['covered-call','assignment'], createdAt:'2025-09-05' },
+
+  /* NVDA Round 3: Put assigned at $207.50 → Called away at $215 */
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:100, entryPrice:207.50, exitPrice:215.00, entryDate:'2025-10-31', exitDate:'2026-05-08',
+    pnl:750, notes:'100 shares received via put assignment (NVDA 10/31 207.50P). Held ~7 months with continuous covered calls. Called away at $215 via assignment (NVDA 5/8 215C).', tags:['put-assignment','covered-call','assignment'], createdAt:'2025-10-31' },
+
+  /* NVDA partial sells — Nov 2025 lots (avg cost ~$181.55) */
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:8, entryPrice:181.55, exitPrice:200.665, entryDate:'2025-11-07', exitDate:'2026-04-17',
+    pnl:153, notes:'NVDA partial sell. Lots from Nov 2025 accumulation (avg $181.55: 10sh@190.24, 10sh@181.76, 10sh@172.64).', tags:[], createdAt:'2025-11-07' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:181.55, exitPrice:210.155, entryDate:'2025-11-07', exitDate:'2026-04-24',
+    pnl:143, notes:'NVDA partial sell. Nov 2025 lots.', tags:[], createdAt:'2025-11-07' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:181.55, exitPrice:215.125, entryDate:'2025-11-07', exitDate:'2026-04-27',
+    pnl:168, notes:'NVDA partial sell. Nov 2025 lots.', tags:[], createdAt:'2025-11-07' },
+
+  /* NVDA partial sells — March 2026 lots (avg cost ~$175.52) */
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:175.52, exitPrice:221.63, entryDate:'2026-03-11', exitDate:'2026-05-11',
+    pnl:230, notes:'NVDA partial sell. March 2026 lots (avg $175.52: 10sh@178, 5sh@177.10, 5sh@177.47, 3sh@173.62, 5sh@168.18).', tags:[], createdAt:'2026-03-11' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:175.52, exitPrice:227.61, entryDate:'2026-03-11', exitDate:'2026-05-13',
+    pnl:260, notes:'NVDA partial sell. March 2026 lots.', tags:[], createdAt:'2026-03-11' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:175.52, exitPrice:233.00, entryDate:'2026-03-11', exitDate:'2026-05-14',
+    pnl:287, notes:'NVDA partial sell. March 2026 lots.', tags:[], createdAt:'2026-03-11' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:175.52, exitPrice:207.00, entryDate:'2026-03-11', exitDate:'2026-06-08',
+    pnl:157, notes:'NVDA partial sell. March 2026 lots.', tags:[], createdAt:'2026-03-11' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'NVDA', direction:'long',
+    shares:5, entryPrice:175.52, exitPrice:205.075, entryDate:'2026-03-11', exitDate:'2026-06-12',
+    pnl:148, notes:'NVDA partial sell. March 2026 lots.', tags:[], createdAt:'2026-03-11' },
+
+  /* Open stock positions */
+  { id:genId(), type:'stock', status:'open', ticker:'NVDA', direction:'long',
+    shares:3, entryPrice:175.52, exitPrice:null, entryDate:'2026-03-20', exitDate:null,
+    pnl:0, notes:'Remaining NVDA shares from March 2026 accumulation. ~3 lots still held.', tags:[], createdAt:'2026-03-20' },
+
+  { id:genId(), type:'stock', status:'closed', ticker:'ADBE', direction:'long',
+    shares:100, entryPrice:246.26, exitPrice:202.50, entryDate:'2026-06-08', exitDate:'2026-06-12',
+    pnl:-4376, notes:'Accumulated 100 ADBE on 6/8 across 5 orders: 10@246, 10@245.65, 10@245, 50@246.50, 20@246.74. Avg $246.26. Stock called away at $202.50 via covered call assignment on 6/12. Stock loss: -$4,376. Combined with $200 call premium → net -$4,176.', tags:['swing','covered-call','assignment'], createdAt:'2026-06-08' },
+
+  { id:genId(), type:'stock', status:'open', ticker:'SPCX', direction:'long',
+    shares:10, entryPrice:167.00, exitPrice:null, entryDate:'2026-06-12', exitDate:null,
+    pnl:0, notes:'Bought 10 SPCX on 6/12.', tags:[], createdAt:'2026-06-12' },
+];
+
+/* ===================== FIREBASE ===================== */
+const _fbApp = firebase.initializeApp({
+  apiKey: "AIzaSyCc9aI4NjL5CDSoALoQKKTCZPxDz1D0Tqg",
+  authDomain: "reading-journal-411de.firebaseapp.com",
+  projectId: "reading-journal-411de",
+  storageBucket: "reading-journal-411de.firebasestorage.app",
+  messagingSenderId: "685817787684",
+  appId: "1:685817787684:web:9e09a67b6213a3fbfbafb1"
+});
+const _db = firebase.firestore();
+const _TRADE_DOC = _db.collection('trading').doc('main');
+
+/* ===================== STORAGE ===================== */
+const loadTrades = () => SAMPLE; // initial fallback only
+
+const saveTrades = async (trades) => {
+  try { await _TRADE_DOC.set({ trades }); } catch(e) { console.error('Firebase save error', e); }
+};
+
+/* ===================== SVG ICONS ===================== */
+const icons = {
+  dashboard: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
+  list: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>,
+  plus: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  x: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  trash: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+  search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  check: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  eye: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  trending_up: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  trending_down: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
+  bar_chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>,
+  lock_open: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
+  award: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
+};
+
+const Ico = ({ name, size = 18 }) => (
+  <span style={{ width: size, height: size, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+    {React.cloneElement(icons[name], { width: size, height: size })}
+  </span>
+);
+
+/* ===================== STAT CARD ===================== */
+const StatCard = ({ label, value, sub, color, icon }) => (
+  <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:12, padding:'20px 22px' }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+      <div>
+        <div style={{ color:'#64748b', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:10 }}>{label}</div>
+        <div style={{ fontSize:26, fontWeight:800, color, lineHeight:1 }}>{value}</div>
+        {sub && <div style={{ color:'#475569', fontSize:12, marginTop:6 }}>{sub}</div>}
+      </div>
+      <div style={{ background: color+'18', borderRadius:10, padding:10, color, flexShrink:0 }}>
+        <Ico name={icon} size={22} />
+      </div>
+    </div>
+  </div>
+);
+
+/* ===================== MONTHLY CHART ===================== */
+const MonthlyChart = ({ trades }) => {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  const data = useMemo(() => {
+    const m = {};
+    trades.filter(t => t.status === 'closed').forEach(t => {
+      const d = t.type === 'option' ? t.closeDate : t.exitDate;
+      if (!d) return;
+      const key = d.slice(0, 7);
+      m[key] = (m[key] || 0) + t.pnl;
+    });
+    const keys = Object.keys(m).sort();
+    return {
+      labels: keys.map(k => {
+        const [y, mo] = k.split('-');
+        return `${MONTHS_EN[parseInt(mo)-1]} '${y.slice(2)}`;
+      }),
+      values: keys.map(k => m[k])
+    };
+  }, [trades]);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+    if (data.labels.length === 0) return;
+    const ctx = canvasRef.current.getContext('2d');
+    chartRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.values,
+          backgroundColor: data.values.map(v => v >= 0 ? '#22c55e28' : '#ef444428'),
+          borderColor: data.values.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+          borderWidth: 2,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#f1f5f9',
+            callbacks: { label: ctx => ` ${fmtPnL(ctx.raw)}` }
+          }
+        },
+        scales: {
+          x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 12 } }, border: { color: '#334155' } },
+          y: { grid: { color: '#334155' }, ticks: { color: '#64748b', font: { size: 11 }, callback: v => fmt$(v) }, border: { color: '#334155' } }
+        }
+      }
+    });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, [data]);
+
+  return (
+    <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:12, padding:24 }}>
+      <div style={{ fontWeight:700, fontSize:15, marginBottom:18 }}>每月損益 Monthly P&amp;L</div>
+      {data.labels.length === 0
+        ? <div style={{ height:200, display:'flex', alignItems:'center', justifyContent:'center', color:'#475569' }}>尚無已結清交易資料</div>
+        : <div style={{ height:220 }}><canvas ref={canvasRef} /></div>
+      }
+    </div>
+  );
+};
+
+/* ===================== EQUITY CURVE ===================== */
+const EquityCurve = ({ trades }) => {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  const data = useMemo(() => {
+    const closed = trades
+      .filter(t => t.status === 'closed')
+      .map(t => ({ date: t.type === 'option' ? t.closeDate : t.exitDate, pnl: t.pnl }))
+      .filter(t => t.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (closed.length === 0) return null;
+    let cum = 0;
+    const points = [{ date: 'Start', cum: 0 }];
+    closed.forEach(t => { cum += t.pnl; points.push({ date: t.date, cum }); });
+    return { labels: points.map(p => p.date), values: points.map(p => p.cum) };
+  }, [trades]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !data) return;
+    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+    const lastVal = data.values[data.values.length - 1];
+    const lineColor = lastVal >= 0 ? '#22c55e' : '#ef4444';
+    const ctx = canvasRef.current.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 160);
+    gradient.addColorStop(0, lineColor + '40');
+    gradient.addColorStop(1, lineColor + '00');
+    chartRef.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.values,
+          borderColor: lineColor,
+          borderWidth: 2.5,
+          fill: true,
+          backgroundColor: gradient,
+          tension: 0.4,
+          pointRadius: data.values.length > 20 ? 0 : 4,
+          pointBackgroundColor: lineColor,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#f1f5f9',
+            callbacks: { label: ctx => ` Cumulative: ${fmtPnL(ctx.raw)}` }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 }, maxTicksLimit: 8 }, border: { color: '#334155' } },
+          y: { grid: { color: '#334155' }, ticks: { color: '#64748b', font: { size: 11 }, callback: v => fmt$(v) }, border: { color: '#334155' } }
+        }
+      }
+    });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, [data]);
+
+  if (!data) return null;
+  return (
+    <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:12, padding:24 }}>
+      <div style={{ fontWeight:700, fontSize:15, marginBottom:18 }}>累計損益曲線 Equity Curve</div>
+      <div style={{ height:180 }}><canvas ref={canvasRef} /></div>
+    </div>
+  );
+};
+
+/* ===================== DETAIL ROW ===================== */
+const DetailRow = ({ label, value }) => (
+  <div style={{ background:'#0f172a', borderRadius:8, padding:'10px 14px' }}>
+    <div style={{ color:'#475569', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>{label}</div>
+    <div style={{ color:'#e2e8f0', fontSize:14, fontWeight:600 }}>{value || '—'}</div>
+  </div>
+);
+
+/* ===================== TRADE DETAIL MODAL ===================== */
+const TradeDetailModal = ({ trade, onClose, onDelete }) => {
+  const isStock = trade.type === 'stock';
+  const isOpen = trade.status === 'open';
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'#000000bb', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:20 }}>
+      <div className="fade-in" style={{ background:'#1e293b', borderRadius:16, padding:32, width:'100%', maxWidth:540, border:'1px solid #334155', maxHeight:'90vh', overflowY:'auto' }}>
+        {/* Header */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            <span style={{ fontSize:24, fontWeight:800 }}>{trade.ticker}</span>
+            <span style={{ padding:'3px 10px', borderRadius:6, fontSize:12, fontWeight:700,
+              background: isStock ? '#3b82f620' : '#a855f720',
+              color: isStock ? '#60a5fa' : '#c084fc' }}>
+              {isStock ? '正股' : '期權'}
+            </span>
+            <span style={{ padding:'3px 10px', borderRadius:6, fontSize:12, fontWeight:600,
+              background: isOpen ? '#f59e0b20' : '#22c55e20',
+              color: isOpen ? '#fbbf24' : '#4ade80' }}>
+              {isOpen ? '持倉中 Open' : '已結清 Closed'}
+            </span>
+          </div>
+          <button onClick={onClose} style={{ background:'#334155', border:'none', borderRadius:8, padding:7, color:'#94a3b8', display:'flex' }} className="action-btn">
+            <Ico name="x" size={16} />
+          </button>
+        </div>
+
+        {/* P&L Banner */}
+        {!isOpen && (
+          <div style={{ background: trade.pnl >= 0 ? '#22c55e12' : '#ef444412', border:`1px solid ${trade.pnl >= 0 ? '#22c55e40' : '#ef444440'}`, borderRadius:12, padding:'18px 24px', marginBottom:24, textAlign:'center' }}>
+            <div style={{ color:'#64748b', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>實現損益 Realized P&amp;L</div>
+            <div style={{ fontSize:40, fontWeight:900, color: trade.pnl >= 0 ? '#4ade80' : '#f87171', marginTop:6 }}>{fmtPnL(trade.pnl)}</div>
+          </div>
+        )}
+
+        {/* Details */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+          {isStock ? <>
+            <DetailRow label="方向 Direction" value={trade.direction === 'long' ? '做多 Long' : '做空 Short'} />
+            <DetailRow label="股數 Shares" value={trade.shares?.toLocaleString()} />
+            <DetailRow label="買入日期 Entry" value={trade.entryDate} />
+            <DetailRow label="買入價 Entry Price" value={`$${trade.entryPrice?.toFixed(2)}`} />
+            {!isOpen && <>
+              <DetailRow label="賣出日期 Exit" value={trade.exitDate} />
+              <DetailRow label="賣出價 Exit Price" value={`$${trade.exitPrice?.toFixed(2)}`} />
+            </>}
+          </> : <>
+            <DetailRow label="類型 Type" value={trade.optionType === 'call' ? 'Call (買權)' : 'Put (賣權)'} />
+            <DetailRow label="Strike Price" value={`$${trade.strike}`} />
+            <DetailRow label="到期日 Expiry" value={trade.expiry} />
+            <DetailRow label="合約數 Contracts" value={`${trade.contracts} 張`} />
+            <DetailRow label="開倉日期 Open" value={trade.openDate} />
+            <DetailRow label="買入 Premium" value={`$${trade.entryPremium?.toFixed(2)}`} />
+            {!isOpen && <>
+              <DetailRow label="平倉日期 Close" value={trade.closeDate} />
+              <DetailRow label="平倉 Premium" value={`$${trade.exitPremium?.toFixed(2)}`} />
+            </>}
+          </>}
+        </div>
+
+        {/* Tags */}
+        {trade.tags && trade.tags.length > 0 && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ color:'#475569', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>標籤 Tags</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {trade.tags.map(tag => (
+                <span key={tag} style={{ padding:'4px 12px', borderRadius:99, background:'#334155', color:'#94a3b8', fontSize:12, fontWeight:600 }}>#{tag}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        {trade.notes && (
+          <div style={{ background:'#0f172a', borderRadius:10, padding:16 }}>
+            <div style={{ color:'#475569', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>交易筆記 Notes</div>
+            <div style={{ color:'#94a3b8', fontSize:14, lineHeight:1.7 }}>{trade.notes}</div>
+          </div>
+        )}
+
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:20 }}>
+          <button onClick={() => { onDelete(trade.id); onClose(); }} style={{ padding:'8px 18px', borderRadius:8, background:'#ef444420', color:'#f87171', border:'none', fontWeight:600, fontSize:13 }} className="action-btn">
+            刪除此筆交易
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== CLOSE TRADE MODAL ===================== */
+const CloseTradeModal = ({ trade, onClose, onSubmit }) => {
+  const isStock = trade.type === 'stock';
+  const [f, setF] = useState({ date: today(), price: '', notes: trade.notes || '' });
+
+  const calcPnL = () => {
+    const price = parseFloat(f.price);
+    if (!price) return null;
+    if (isStock) {
+      const diff = trade.direction === 'long'
+        ? (price - trade.entryPrice) * trade.shares
+        : (trade.entryPrice - price) * trade.shares;
+      return diff;
+    } else {
+      return (price - trade.entryPremium) * trade.contracts * 100;
+    }
+  };
+
+  const pnl = calcPnL();
+
+  const handleSubmit = () => {
+    if (!f.price) { alert('請輸入價格'); return; }
+    const price = parseFloat(f.price);
+    onSubmit({
+      status: 'closed',
+      ...(isStock ? { exitDate: f.date, exitPrice: price } : { closeDate: f.date, exitPremium: price }),
+      pnl: pnl || 0,
+      notes: f.notes,
+    });
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'#000000bb', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:20 }}>
+      <div className="fade-in" style={{ background:'#1e293b', borderRadius:16, padding:32, width:'100%', maxWidth:460, border:'1px solid #334155' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
+          <div>
+            <div style={{ fontWeight:800, fontSize:18 }}>平倉 {trade.ticker}</div>
+            <div style={{ color:'#64748b', fontSize:13, marginTop:4 }}>
+              {isStock ? `${trade.direction === 'long' ? '做多' : '做空'} ${trade.shares} 股 @ $${trade.entryPrice}` : `${trade.optionType?.toUpperCase()} $${trade.strike} × ${trade.contracts} 張`}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:'#334155', border:'none', borderRadius:8, padding:7, color:'#94a3b8', display:'flex' }} className="action-btn">
+            <Ico name="x" size={16} />
+          </button>
+        </div>
+
+        <div style={{ display:'grid', gap:16 }}>
+          <div>
+            <label style={{ display:'block', color:'#94a3b8', fontSize:13, fontWeight:600, marginBottom:6 }}>平倉日期</label>
+            <input type="date" value={f.date} onChange={e => setF({...f, date: e.target.value})} />
+          </div>
+          <div>
+            <label style={{ display:'block', color:'#94a3b8', fontSize:13, fontWeight:600, marginBottom:6 }}>
+              {isStock ? '賣出價 Exit Price' : '平倉 Premium'}
+            </label>
+            <input type="number" step="0.01" placeholder="0.00" value={f.price}
+              onChange={e => setF({...f, price: e.target.value})} autoFocus />
+          </div>
+
+          {pnl !== null && (
+            <div style={{ background: pnl >= 0 ? '#22c55e12' : '#ef444412', border:`1px solid ${pnl >= 0 ? '#22c55e40' : '#ef444440'}`, borderRadius:10, padding:18, textAlign:'center' }}>
+              <div style={{ color:'#64748b', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>預計損益</div>
+              <div style={{ fontSize:32, fontWeight:900, color: pnl >= 0 ? '#4ade80' : '#f87171', marginTop:4 }}>{fmtPnL(pnl)}</div>
+            </div>
+          )}
+
+          <div>
+            <label style={{ display:'block', color:'#94a3b8', fontSize:13, fontWeight:600, marginBottom:6 }}>交易心得 (選填)</label>
+            <textarea rows={3} placeholder="記錄出場心得..." value={f.notes}
+              onChange={e => setF({...f, notes: e.target.value})} style={{ resize:'vertical' }} />
+          </div>
+
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={onClose} style={{ flex:1, padding:'11px 0', borderRadius:10, background:'transparent', color:'#94a3b8', border:'1px solid #334155', fontWeight:600 }} className="action-btn">取消</button>
+            <button onClick={handleSubmit} style={{ flex:2, padding:'11px 0', borderRadius:10, background:'#22c55e', color:'#0f172a', border:'none', fontWeight:700, fontSize:15 }} className="action-btn">確認平倉</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== ADD TRADE FORM ===================== */
+const AddTradeForm = ({ onSubmit, onCancel }) => {
+  const [type, setType] = useState('stock');
+  const [f, setF] = useState({
+    ticker:'', status:'open',
+    direction:'long', shares:'', entryPrice:'', exitPrice:'', entryDate:today(), exitDate:'',
+    optionType:'call', strike:'', expiry:'', contracts:'', entryPremium:'', exitPremium:'', openDate:today(), closeDate:'',
+    notes:'', tags:''
+  });
+  const set = (k, v) => setF(prev => ({...prev, [k]: v}));
+
+  const calcPnL = () => {
+    if (f.status === 'open') return null;
+    if (type === 'stock') {
+      const entry = parseFloat(f.entryPrice), exit = parseFloat(f.exitPrice), shares = parseInt(f.shares);
+      if (!entry || !exit || !shares) return null;
+      return f.direction === 'long' ? (exit - entry) * shares : (entry - exit) * shares;
+    } else {
+      const ep = parseFloat(f.entryPremium), xp = parseFloat(f.exitPremium), c = parseInt(f.contracts);
+      if (!ep || !xp || !c) return null;
+      return (xp - ep) * c * 100;
+    }
+  };
+
+  const pnl = calcPnL();
+
+  const handleSubmit = () => {
+    if (!f.ticker.trim()) { alert('請輸入股票代碼'); return; }
+    const tags = f.tags ? f.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const trade = {
+      id: genId(), type, status: f.status, ticker: f.ticker.trim().toUpperCase(),
+      pnl: pnl || 0, notes: f.notes.trim(), tags, createdAt: today(),
+      ...(type === 'stock' ? {
+        direction: f.direction,
+        shares: parseInt(f.shares) || 0,
+        entryPrice: parseFloat(f.entryPrice) || 0,
+        exitPrice: f.status === 'closed' ? (parseFloat(f.exitPrice) || 0) : null,
+        entryDate: f.entryDate, exitDate: f.status === 'closed' ? f.exitDate : null,
+      } : {
+        optionType: f.optionType,
+        strike: parseFloat(f.strike) || 0,
+        expiry: f.expiry,
+        contracts: parseInt(f.contracts) || 0,
+        entryPremium: parseFloat(f.entryPremium) || 0,
+        exitPremium: f.status === 'closed' ? (parseFloat(f.exitPremium) || 0) : null,
+        openDate: f.openDate, closeDate: f.status === 'closed' ? f.closeDate : null,
+      })
+    };
+    onSubmit(trade);
+  };
+
+  const LabelEl = ({ children }) => (
+    <label style={{ display:'block', color:'#94a3b8', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:6 }}>{children}</label>
+  );
+  const Row = ({ children, cols = '1fr 1fr' }) => (
+    <div style={{ display:'grid', gridTemplateColumns: cols, gap:14 }}>{children}</div>
+  );
+
+  return (
+    <div style={{ maxWidth:660, margin:'0 auto' }}>
+      <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:16, padding:32 }}>
+        <h2 style={{ fontSize:20, fontWeight:800, marginBottom:24 }}>新增交易</h2>
+
+        {/* Type Toggle */}
+        <div style={{ display:'flex', background:'#0f172a', borderRadius:10, padding:4, marginBottom:24, gap:4 }}>
+          {[['stock','📊 正股 Stock'],['option','🎯 期權 Option']].map(([val, label]) => (
+            <button key={val} onClick={() => setType(val)} style={{
+              flex:1, padding:'11px 0', borderRadius:8, border:'none',
+              background: type === val ? '#3b82f6' : 'transparent',
+              color: type === val ? '#fff' : '#64748b',
+              fontWeight:700, fontSize:14, transition:'all 0.2s'
+            }}>{label}</button>
+          ))}
+        </div>
+
+        <div style={{ display:'grid', gap:16 }}>
+          <Row>
+            <div>
+              <LabelEl>股票代碼 Ticker *</LabelEl>
+              <input placeholder="AAPL" value={f.ticker} onChange={e => set('ticker', e.target.value.toUpperCase())}
+                style={{ fontWeight:700, letterSpacing:2, textTransform:'uppercase' }} />
+            </div>
+            <div>
+              <LabelEl>狀態 Status</LabelEl>
+              <select value={f.status} onChange={e => set('status', e.target.value)}>
+                <option value="open">持倉中 Open</option>
+                <option value="closed">已結清 Closed</option>
+              </select>
+            </div>
+          </Row>
+
+          {type === 'stock' ? (<>
+            <Row>
+              <div>
+                <LabelEl>方向 Direction</LabelEl>
+                <select value={f.direction} onChange={e => set('direction', e.target.value)}>
+                  <option value="long">做多 Long</option>
+                  <option value="short">做空 Short</option>
+                </select>
+              </div>
+              <div>
+                <LabelEl>股數 Shares</LabelEl>
+                <input type="number" placeholder="100" value={f.shares} onChange={e => set('shares', e.target.value)} />
+              </div>
+            </Row>
+            <Row>
+              <div>
+                <LabelEl>買入日期 Entry Date</LabelEl>
+                <input type="date" value={f.entryDate} onChange={e => set('entryDate', e.target.value)} />
+              </div>
+              <div>
+                <LabelEl>買入價 Entry Price</LabelEl>
+                <input type="number" step="0.01" placeholder="0.00" value={f.entryPrice} onChange={e => set('entryPrice', e.target.value)} />
+              </div>
+            </Row>
+            {f.status === 'closed' && <Row>
+              <div>
+                <LabelEl>賣出日期 Exit Date</LabelEl>
+                <input type="date" value={f.exitDate} onChange={e => set('exitDate', e.target.value)} />
+              </div>
+              <div>
+                <LabelEl>賣出價 Exit Price</LabelEl>
+                <input type="number" step="0.01" placeholder="0.00" value={f.exitPrice} onChange={e => set('exitPrice', e.target.value)} />
+              </div>
+            </Row>}
+          </>) : (<>
+            <Row>
+              <div>
+                <LabelEl>類型 Option Type</LabelEl>
+                <select value={f.optionType} onChange={e => set('optionType', e.target.value)}>
+                  <option value="call">Call (買權)</option>
+                  <option value="put">Put (賣權)</option>
+                </select>
+              </div>
+              <div>
+                <LabelEl>Strike Price</LabelEl>
+                <input type="number" step="0.5" placeholder="500" value={f.strike} onChange={e => set('strike', e.target.value)} />
+              </div>
+            </Row>
+            <Row>
+              <div>
+                <LabelEl>到期日 Expiry</LabelEl>
+                <input type="date" value={f.expiry} onChange={e => set('expiry', e.target.value)} />
+              </div>
+              <div>
+                <LabelEl>合約數 Contracts</LabelEl>
+                <input type="number" placeholder="1" value={f.contracts} onChange={e => set('contracts', e.target.value)} />
+              </div>
+            </Row>
+            <Row>
+              <div>
+                <LabelEl>開倉日期 Open Date</LabelEl>
+                <input type="date" value={f.openDate} onChange={e => set('openDate', e.target.value)} />
+              </div>
+              <div>
+                <LabelEl>買入 Premium / 股</LabelEl>
+                <input type="number" step="0.01" placeholder="0.00" value={f.entryPremium} onChange={e => set('entryPremium', e.target.value)} />
+              </div>
+            </Row>
+            {f.status === 'closed' && <Row>
+              <div>
+                <LabelEl>平倉日期 Close Date</LabelEl>
+                <input type="date" value={f.closeDate} onChange={e => set('closeDate', e.target.value)} />
+              </div>
+              <div>
+                <LabelEl>平倉 Premium / 股</LabelEl>
+                <input type="number" step="0.01" placeholder="0.00" value={f.exitPremium} onChange={e => set('exitPremium', e.target.value)} />
+              </div>
+            </Row>}
+          </>)}
+
+          {pnl !== null && (
+            <div style={{ background: pnl >= 0 ? '#22c55e12' : '#ef444412', border:`1px solid ${pnl >= 0 ? '#22c55e40' : '#ef444440'}`, borderRadius:10, padding:16, textAlign:'center' }}>
+              <div style={{ color:'#64748b', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>計算損益</div>
+              <div style={{ fontSize:28, fontWeight:900, color: pnl >= 0 ? '#4ade80' : '#f87171', marginTop:4 }}>{fmtPnL(pnl)}</div>
+            </div>
+          )}
+
+          <div>
+            <LabelEl>交易筆記 Notes</LabelEl>
+            <textarea rows={3} placeholder="記錄進出場邏輯、情緒狀態、策略心得..." value={f.notes}
+              onChange={e => set('notes', e.target.value)} style={{ resize:'vertical' }} />
+          </div>
+
+          <div>
+            <LabelEl>標籤 Tags <span style={{ color:'#475569', textTransform:'none', letterSpacing:0 }}>(逗號分隔)</span></LabelEl>
+            <input placeholder="swing, breakout, earnings, macro..." value={f.tags} onChange={e => set('tags', e.target.value)} />
+          </div>
+
+          <div style={{ display:'flex', gap:12, paddingTop:4 }}>
+            <button onClick={onCancel} style={{ flex:1, padding:'13px 0', borderRadius:10, background:'transparent', color:'#94a3b8', border:'1px solid #334155', fontWeight:600, fontSize:15 }} className="action-btn">取消</button>
+            <button onClick={handleSubmit} style={{ flex:2, padding:'13px 0', borderRadius:10, background:'#3b82f6', color:'#fff', border:'none', fontWeight:700, fontSize:15 }} className="action-btn">新增交易 ＋</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== DASHBOARD ===================== */
+const Dashboard = ({ trades }) => {
+  const closed = trades.filter(t => t.status === 'closed');
+  const open = trades.filter(t => t.status === 'open');
+  const winners = closed.filter(t => t.pnl > 0);
+  const losers = closed.filter(t => t.pnl < 0);
+  const totalPnL = closed.reduce((s, t) => s + t.pnl, 0);
+  const winRate = closed.length > 0 ? (winners.length / closed.length * 100) : 0;
+  const avgWin = winners.length > 0 ? winners.reduce((s,t) => s+t.pnl, 0) / winners.length : 0;
+  const avgLoss = losers.length > 0 ? losers.reduce((s,t) => s+t.pnl, 0) / losers.length : 0;
+  const pfRatio = avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : null;
+  const best = closed.length > 0 ? closed.reduce((b, t) => t.pnl > b.pnl ? t : b, closed[0]) : null;
+  const worst = closed.length > 0 ? closed.reduce((w, t) => t.pnl < w.pnl ? t : w, closed[0]) : null;
+
+  const recent = [...trades].sort((a,b) => {
+    const da = a.type === 'stock' ? a.entryDate : a.openDate;
+    const db = b.type === 'stock' ? b.entryDate : b.openDate;
+    return (db||'').localeCompare(da||'');
+  }).slice(0, 6);
+
+  return (
+    <div style={{ display:'grid', gap:20 }}>
+      {/* Stat cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(210px, 1fr))', gap:14 }}>
+        <StatCard label="總損益 Total P&L" value={fmtPnL(totalPnL)} sub={`共 ${closed.length} 筆已結清`}
+          color={totalPnL >= 0 ? '#4ade80' : '#f87171'} icon={totalPnL >= 0 ? 'trending_up' : 'trending_down'} />
+        <StatCard label="勝率 Win Rate" value={`${winRate.toFixed(1)}%`} sub={`${winners.length} 勝 / ${losers.length} 敗`}
+          color="#60a5fa" icon="bar_chart" />
+        <StatCard label="持倉中 Open" value={open.length} sub="尚未平倉的倉位"
+          color="#fbbf24" icon="lock_open" />
+        <StatCard label="盈虧比 P/L Ratio" value={pfRatio ? pfRatio.toFixed(2) : '—'} sub={pfRatio ? `均盈 ${fmt$(avgWin)} · 均虧 ${fmt$(avgLoss)}` : '尚無資料'}
+          color="#a78bfa" icon="award" />
+      </div>
+
+      {/* Charts */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <MonthlyChart trades={trades} />
+        <EquityCurve trades={trades} />
+      </div>
+
+      {/* Best / Worst */}
+      {(best || worst) && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          {best && <div style={{ background:'#1e293b', border:'1px solid #22c55e40', borderRadius:12, padding:20 }}>
+            <div style={{ color:'#4ade80', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>🏆 最佳交易</div>
+            <div style={{ fontWeight:800, fontSize:18 }}>{best.ticker}</div>
+            <div style={{ color:'#64748b', fontSize:12, marginTop:2 }}>{best.type === 'option' ? `${best.optionType?.toUpperCase()} $${best.strike}` : `${best.shares} 股`}</div>
+            <div style={{ color:'#4ade80', fontSize:24, fontWeight:900, marginTop:8 }}>{fmtPnL(best.pnl)}</div>
+          </div>}
+          {worst && <div style={{ background:'#1e293b', border:'1px solid #ef444440', borderRadius:12, padding:20 }}>
+            <div style={{ color:'#f87171', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📉 最差交易</div>
+            <div style={{ fontWeight:800, fontSize:18 }}>{worst.ticker}</div>
+            <div style={{ color:'#64748b', fontSize:12, marginTop:2 }}>{worst.type === 'option' ? `${worst.optionType?.toUpperCase()} $${worst.strike}` : `${worst.shares} 股`}</div>
+            <div style={{ color:'#f87171', fontSize:24, fontWeight:900, marginTop:8 }}>{fmtPnL(worst.pnl)}</div>
+          </div>}
+        </div>
+      )}
+
+      {/* Recent trades */}
+      <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:12 }}>
+        <div style={{ padding:'16px 22px', borderBottom:'1px solid #334155', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontWeight:700, fontSize:15 }}>近期交易</div>
+          <div style={{ color:'#475569', fontSize:12 }}>最新 {recent.length} 筆</div>
+        </div>
+        <table style={{ width:'100%' }}>
+          <tbody>
+            {recent.map(t => (
+              <tr key={t.id} style={{ borderBottom:'1px solid #0f172a' }}>
+                <td style={{ padding:'12px 22px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ padding:'2px 8px', borderRadius:5, fontSize:11, fontWeight:700,
+                      background: t.type === 'stock' ? '#3b82f620' : '#a855f720',
+                      color: t.type === 'stock' ? '#60a5fa' : '#c084fc' }}>
+                      {t.type === 'stock' ? '股' : '期'}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight:700 }}>{t.ticker}</div>
+                      <div style={{ fontSize:11, color:'#475569' }}>
+                        {t.type === 'stock' ? `${t.shares?.toLocaleString()} 股` : `${t.optionType?.toUpperCase()} $${t.strike} × ${t.contracts}`}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding:'12px 22px', color:'#64748b', fontSize:13 }}>
+                  {t.type === 'stock' ? t.entryDate : t.openDate}
+                </td>
+                <td style={{ padding:'12px 22px', textAlign:'right' }}>
+                  {t.status === 'open'
+                    ? <span style={{ color:'#fbbf24', fontSize:13, fontWeight:600 }}>持倉中</span>
+                    : <span style={{ color: t.pnl >= 0 ? '#4ade80' : '#f87171', fontWeight:800, fontSize:15 }}>{fmtPnL(t.pnl)}</span>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== TRADE HISTORY ===================== */
+const TradeHistory = ({ trades, onView, onClose, onDelete }) => {
+  const [search, setSearch] = useState('');
+  const [fType, setFType] = useState('all');
+  const [fStatus, setFStatus] = useState('all');
+
+  const filtered = useMemo(() => {
+    return trades.filter(t => {
+      const q = search.toUpperCase();
+      const matchQ = !q || t.ticker.includes(q) || (t.notes||'').toLowerCase().includes(search.toLowerCase()) || (t.tags||[]).some(tag => tag.includes(search.toLowerCase()));
+      const matchType = fType === 'all' || t.type === fType;
+      const matchStatus = fStatus === 'all' || t.status === fStatus;
+      return matchQ && matchType && matchStatus;
+    }).sort((a, b) => {
+      const da = a.type === 'stock' ? a.entryDate : a.openDate;
+      const db = b.type === 'stock' ? b.entryDate : b.openDate;
+      return (db||'').localeCompare(da||'');
+    });
+  }, [trades, search, fType, fStatus]);
+
+  const filteredPnL = filtered.filter(t => t.status === 'closed').reduce((s, t) => s + t.pnl, 0);
+
+  return (
+    <div>
+      {/* Filter bar */}
+      <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
+        <div style={{ position:'relative', flex:1, minWidth:200 }}>
+          <div style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', pointerEvents:'none' }}>
+            <Ico name="search" size={16} />
+          </div>
+          <input placeholder="搜尋代碼、筆記、標籤..." value={search}
+            onChange={e => setSearch(e.target.value)} style={{ paddingLeft:36 }} />
+        </div>
+        <select value={fType} onChange={e => setFType(e.target.value)} style={{ width:'auto', minWidth:130 }}>
+          <option value="all">全部類型</option>
+          <option value="stock">正股</option>
+          <option value="option">期權</option>
+        </select>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ width:'auto', minWidth:130 }}>
+          <option value="all">全部狀態</option>
+          <option value="open">持倉中</option>
+          <option value="closed">已結清</option>
+        </select>
+        <div style={{ color:'#64748b', fontSize:13, whiteSpace:'nowrap' }}>
+          {filtered.length} 筆 &nbsp;·&nbsp;
+          <span style={{ color: filteredPnL >= 0 ? '#4ade80' : '#f87171', fontWeight:700 }}>{fmtPnL(filteredPnL)}</span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:12, overflow:'hidden' }}>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', minWidth:600 }}>
+            <thead>
+              <tr style={{ background:'#0f172a', borderBottom:'1px solid #334155' }}>
+                {['交易 Trade','日期 Date','狀態','P&L','操作'].map((h, i) => (
+                  <th key={h} style={{ padding:'11px 16px', textAlign: i >= 3 ? 'right' : 'left', color:'#475569', fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={5} style={{ padding:56, textAlign:'center', color:'#334155' }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+                  <div style={{ fontSize:15 }}>沒有符合的交易記錄</div>
+                </td></tr>
+              ) : filtered.map(trade => {
+                const isOpen = trade.status === 'open';
+                const date = trade.type === 'stock' ? trade.entryDate : trade.openDate;
+                const closeDate = trade.type === 'stock' ? trade.exitDate : trade.closeDate;
+                return (
+                  <tr key={trade.id} className="trade-row" style={{ borderBottom:'1px solid #0f172a', cursor:'pointer' }}
+                    onClick={() => onView(trade)}>
+                    <td style={{ padding:'12px 16px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <span style={{ padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:700, flexShrink:0,
+                          background: trade.type === 'stock' ? '#3b82f620' : '#a855f720',
+                          color: trade.type === 'stock' ? '#60a5fa' : '#c084fc' }}>
+                          {trade.type === 'stock' ? '股' : '期'}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight:700, fontSize:15 }}>{trade.ticker}</div>
+                          <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>
+                            {trade.type === 'stock'
+                              ? `${trade.direction === 'long' ? 'Long' : 'Short'} ${trade.shares?.toLocaleString()} 股`
+                              : `${trade.optionType?.toUpperCase()} $${trade.strike} exp ${trade.expiry} × ${trade.contracts}`}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding:'12px 16px' }}>
+                      <div style={{ color:'#94a3b8', fontSize:13 }}>{date}</div>
+                      {closeDate && <div style={{ color:'#475569', fontSize:11, marginTop:2 }}>→ {closeDate}</div>}
+                    </td>
+                    <td style={{ padding:'12px 16px' }}>
+                      <span style={{ padding:'4px 10px', borderRadius:99, fontSize:12, fontWeight:600,
+                        background: isOpen ? '#f59e0b20' : '#22c55e20',
+                        color: isOpen ? '#fbbf24' : '#4ade80' }}>
+                        {isOpen ? '持倉中' : '已結清'}
+                      </span>
+                    </td>
+                    <td style={{ padding:'12px 16px', textAlign:'right' }}>
+                      {isOpen
+                        ? <span style={{ color:'#475569', fontSize:13 }}>—</span>
+                        : <span style={{ fontWeight:800, fontSize:16, color: trade.pnl >= 0 ? '#4ade80' : '#f87171' }}>{fmtPnL(trade.pnl)}</span>
+                      }
+                    </td>
+                    <td style={{ padding:'12px 16px' }}>
+                      <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }} onClick={e => e.stopPropagation()}>
+                        {isOpen && (
+                          <button onClick={() => onClose(trade)} style={{ padding:'5px 12px', borderRadius:7, fontSize:12, background:'#22c55e20', color:'#4ade80', border:'none', fontWeight:700 }} className="action-btn">
+                            平倉
+                          </button>
+                        )}
+                        <button onClick={() => onView(trade)} style={{ padding:7, borderRadius:7, background:'#334155', color:'#94a3b8', border:'none', display:'flex' }} className="action-btn">
+                          <Ico name="eye" size={14} />
+                        </button>
+                        <button onClick={() => { if(window.confirm('確認刪除？')) onDelete(trade.id); }} style={{ padding:7, borderRadius:7, background:'#ef444420', color:'#f87171', border:'none', display:'flex' }} className="action-btn">
+                          <Ico name="trash" size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ===================== APP ===================== */
+function App() {
+  const [trades, setTrades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('dashboard');
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewTrade, setViewTrade] = useState(null);
+  const [closeTrade, setCloseTrade] = useState(null);
+
+  // Load from Firebase on mount + real-time sync
+  useEffect(() => {
+    const unsub = _TRADE_DOC.onSnapshot((snap) => {
+      if (snap.exists()) {
+        setTrades(snap.data().trades || []);
+      } else {
+        // First time: seed with SAMPLE data
+        _TRADE_DOC.set({ trades: SAMPLE });
+        setTrades(SAMPLE);
+      }
+      setLoading(false);
+    }, (err) => {
+      console.error('Firebase sync error', err);
+      setTrades(SAMPLE);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Save to Firebase whenever trades change (skip initial empty state)
+  const isFirstRender = React.useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (trades.length > 0) saveTrades(trades);
+  }, [trades]);
+
+  const addTrade = useCallback((t) => { setTrades(p => [t, ...p]); setShowAdd(false); setTab('history'); }, []);
+  const deleteTrade = useCallback((id) => { setTrades(p => p.filter(t => t.id !== id)); }, []);
+  const doClose = useCallback((trade) => setCloseTrade(trade), []);
+  const submitClose = useCallback((id, data) => { setTrades(p => p.map(t => t.id === id ? {...t,...data} : t)); setCloseTrade(null); }, []);
+
+  const openCount = trades.filter(t => t.status === 'open').length;
+  const closedPnL = trades.filter(t => t.status === 'closed').reduce((s,t) => s+t.pnl, 0);
+
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:16, background:'#0f172a' }}>
+      <div style={{ fontSize:40 }}>📈</div>
+      <div style={{ color:'#64748b', fontSize:15 }}>從雲端載入交易資料...</div>
+    </div>
+  );
+
+  const NavItem = ({ id, icon, label }) => {
+    const active = tab === id && !showAdd;
+    return (
+      <button onClick={() => { setTab(id); setShowAdd(false); }} className="nav-btn" style={{
+        display:'flex', alignItems:'center', gap:12, width:'100%', padding:'11px 14px', borderRadius:10,
+        background: active ? '#3b82f620' : 'transparent',
+        color: active ? '#60a5fa' : '#64748b',
+        border: active ? '1px solid #3b82f640' : '1px solid transparent',
+        fontWeight: active ? 700 : 500, fontSize:14, textAlign:'left', marginBottom:4,
+      }}>
+        <Ico name={icon} size={18} />
+        <span className="nav-label">{label}</span>
+      </button>
+    );
+  };
+
+  return (
+    <div style={{ display:'flex', minHeight:'100vh' }}>
+      {/* Sidebar */}
+      <div className="sidebar" style={{ width:230, background:'#1e293b', borderRight:'1px solid #334155', display:'flex', flexDirection:'column', padding:'24px 14px', position:'fixed', top:0, left:0, height:'100vh', zIndex:50 }}>
+        <div style={{ marginBottom:32, paddingLeft:4 }}>
+          <div className="logo-text">
+            <div style={{ fontSize:17, fontWeight:900, color:'#f1f5f9', letterSpacing:'-0.02em' }}>📈 交易日誌</div>
+            <div style={{ fontSize:11, color:'#334155', marginTop:3, fontWeight:500 }}>US Stock Journal</div>
+          </div>
+        </div>
+
+        <nav style={{ flex:1 }}>
+          <NavItem id="dashboard" icon="dashboard" label="儀表板" />
+          <NavItem id="history" icon="list" label="交易紀錄" />
+        </nav>
+
+        {/* Add button */}
+        <button onClick={() => { setShowAdd(true); setTab(null); }} className="action-btn" style={{
+          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+          width:'100%', padding:'13px 0', borderRadius:10,
+          background: showAdd ? '#2563eb' : '#3b82f6',
+          color:'#fff', border:'none', fontWeight:700, fontSize:14,
+          marginBottom:16, transition:'background 0.15s'
+        }}>
+          <Ico name="plus" size={18} />
+          <span className="nav-label">新增交易</span>
+        </button>
+
+        {/* Summary */}
+        <div className="storage-note" style={{ background:'#0f172a', borderRadius:10, padding:14 }}>
+          <div style={{ color:'#475569', fontSize:11, marginBottom:8, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em' }}>總覽</div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+            <span style={{ color:'#64748b', fontSize:12 }}>持倉中</span>
+            <span style={{ color:'#fbbf24', fontSize:12, fontWeight:700 }}>{openCount}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between' }}>
+            <span style={{ color:'#64748b', fontSize:12 }}>總損益</span>
+            <span style={{ color: closedPnL >= 0 ? '#4ade80' : '#f87171', fontSize:12, fontWeight:700 }}>{fmtPnL(closedPnL)}</span>
+          </div>
+          <div style={{ color:'#334155', fontSize:10, marginTop:10 }}>🔥 資料同步至 Firebase</div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="main-content" style={{ marginLeft:230, flex:1, padding:32, minHeight:'100vh' }}>
+        {showAdd ? (
+          <div className="fade-in">
+            <div style={{ marginBottom:28 }}>
+              <h1 style={{ fontSize:26, fontWeight:900 }}>新增交易</h1>
+              <p style={{ color:'#64748b', marginTop:6 }}>記錄你的正股或期權交易</p>
+            </div>
+            <AddTradeForm onSubmit={addTrade} onCancel={() => { setShowAdd(false); setTab('dashboard'); }} />
+          </div>
+        ) : tab === 'dashboard' ? (
+          <div className="fade-in">
+            <div style={{ marginBottom:28, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <h1 style={{ fontSize:26, fontWeight:900 }}>儀表板</h1>
+                <p style={{ color:'#64748b', marginTop:6 }}>交易績效總覽</p>
+              </div>
+              <button onClick={() => setShowAdd(true)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 20px', borderRadius:10, background:'#3b82f6', color:'#fff', border:'none', fontWeight:700, fontSize:14 }} className="action-btn">
+                <Ico name="plus" size={16} />新增交易
+              </button>
+            </div>
+            <Dashboard trades={trades} />
+          </div>
+        ) : (
+          <div className="fade-in">
+            <div style={{ marginBottom:28, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <h1 style={{ fontSize:26, fontWeight:900 }}>交易紀錄</h1>
+                <p style={{ color:'#64748b', marginTop:6 }}>所有正股與期權交易 ({trades.length} 筆)</p>
+              </div>
+              <button onClick={() => setShowAdd(true)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 20px', borderRadius:10, background:'#3b82f6', color:'#fff', border:'none', fontWeight:700, fontSize:14 }} className="action-btn">
+                <Ico name="plus" size={16} />新增
+              </button>
+            </div>
+            <TradeHistory trades={trades} onView={setViewTrade} onClose={doClose} onDelete={deleteTrade} />
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {viewTrade && <TradeDetailModal trade={viewTrade} onClose={() => setViewTrade(null)} onDelete={(id) => { deleteTrade(id); setViewTrade(null); }} />}
+      {closeTrade && <CloseTradeModal trade={closeTrade} onClose={() => setCloseTrade(null)} onSubmit={(data) => submitClose(closeTrade.id, data)} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
