@@ -1368,7 +1368,7 @@ function App() {
             </div>
             <Dashboard trades={trades} />
           </div>
-        ) : (
+        ) : tab === 'history' ? (
           <div className="fade-in">
             <div style={{ marginBottom:28, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div>
