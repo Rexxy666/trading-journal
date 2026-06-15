@@ -264,37 +264,53 @@ const saveTrades = (t) => {
 };
 
 /* ===================== JOURNAL NOTES STORAGE ===================== */
-const NOTES_KEY = 'trading-journal-notes-v1';
+const NOTES_KEY = 'trading-journal-notes-v2';
 const INIT_NOTES = [
-  { id:'note-1', date:'2026-06-12', title:'ADBE Covered Call 被 Assigned — 心得反思',
+  { id:'note-1', date:'2026-06-12', title:'交易復盤：ADBE 虧損案例分析 (Biggest Loss)',
     mood:'learn',
-    content:`【交易回顧】
-6/8 以均價 $246.26 建倉 100 股 ADBE，當天即賣出 202.50 Call，收取 $2 premium ($200)。
-6/12 到期，ADBE 股價仍高於 strike $202.50，option 被 assigned，100 股以 $202.50 強制賣出。
+    content:`一、交易執行紀錄（以 100 股為基準單位）
 
-【損益結算】
-  期權 premium：+$200
-  股票損失：(202.50 - 246.26) × 100 = -$4,376
-  本次合計：-$4,176
+2026.06.08（建倉日）
+基於日 K 線觸及底部支撐的預期，短時間內高頻率分批買入現股，最終平均成本 246.26 美元/股。
+買入明細：245.65×10 / 246×10 / 246.74×20 / 246.5×50 / 245×10
 
-【問題所在】
-1. Strike 選擇錯誤：202.50 vs 股價 $246，是 deep ITM strike，距離太遠。
-   選這個 strike 等同於從一開始就接受 $4,376 的股票損失，$200 的 premium 根本不夠補。
-   正確做法：CC strike 應設在買入成本以上（>$246.26）才有意義，
-   例如選 $250 Call，讓股票先漲到成本以上再被 call 走。
+2026.06.10（第一次對沖）
+股價下殺，Sell Call 245（0612 到期），收取權利金 7.55。
+新損益平衡點（BEP）：238.71 美元/股
 
-2. 持倉邏輯矛盾：買進看多，卻賣 deep ITM CC，表示實際上並不看多 ADBE。
-   應先問自己：「我看多這支股票嗎？」若不確定，就不該建倉。
+2026.06.12（到期與滾動操作）
+以 0.01 代價 Buy to Close 結清原 Call（BEP 微調至 238.81）。
+股價持續恐慌性拋售，被迫大幅下調履約價，轉開 Sell Call 202.5，收取權利金 2.00。
+新損益平衡點（BEP）：236.81 美元/股
 
-3. 基本面評估不足：ADBE 近期面臨 AI 競爭壓力（Firefly vs Midjourney/Sora），
-   股價長期承壓，進場前應更謹慎評估，而非單看「跌深了可以進」。
+最終結算：-3,431 美元（約佔總成本 -11.4%，佔新 BEP -14.4%）
 
-【下次改進原則】
-✅ Covered Call strike 必須 >= 建倉成本，有獲利空間再賣
-✅ 進場前先確認持倉邏輯（看多 vs 中性 vs 看空）
-✅ 下跌趨勢中，先等企穩訊號再建倉，不要急著接刀
-✅ 若股票基本面有疑慮，用 CSP 代替買股（風險可控）`,
-    tags: ['ADBE','covered-call','assignment','反思','strike選擇'],
+---
+
+二、核心問題剖析與反思
+
+1. 情緒與心理面（FOMO 盲點）
+
+恐懼錯過：建倉當天極度想在日 K 底部支撐一次把 100 股全數買入，害怕隔天跳空大漲而失去靈活性。
+
+主觀偏執：過度預期「短線日 K 觸底必有反彈」，總想著等反彈再 Sell Call 可以賣到更好的 Premium。導致在股價跌破支撐、進入恐慌性拋售的第一時間，部位完全「裸奔」，沒有受到及時保護。
+
+2. 基本面與消息面（護城河與估值修正）
+
+核心優勢動搖：忽視了生成式 AI（Sora、Figma 整合失敗、開源 AI 影片生成模型與 AI Agent）對其傳統設計工作流的降維打擊。用戶與創作者的黏著度正面臨 Claude 等新興工具的去中介化威脅。
+
+市場不確定性：當前大資金更偏好營收爆發力強的 AI 基礎設施硬體股，對軟體股的估值乘數極其嚴苛。當看到公司需要密集宣布 AI 升級、甚至砸錢打折送 Premium 來留住創作者時，這其實是市場焦慮與商業模式不確定性的訊號。
+
+---
+
+三、未來策略修正鐵律（純買現股 + Covered Call 框架）
+
+1. 無條件執行系統化防禦
+Covered Call 必須在買入現股的當下馬上做（或建倉時直接考慮 Collar 策略買入 Put 保護），絕對不要用肉眼主觀預測行情、期待彈上去再賣 Call。
+
+2. 時空分離的分批建倉法
+在無 Sell Put 輔助的前提下，跌下去接必須拉開時間與價格區間。若在高位接了第一批，就要立刻配合 SC 進行防禦，不能在毫無防護的情況下任由整體部位在低位盲目擴大。`,
+    tags: ['ADBE','covered-call','復盤','FOMO','BEP','策略修正'],
     createdAt: '2026-06-12' },
 ];
 const loadNotes = () => {
@@ -974,7 +990,7 @@ const Dashboard = ({ trades }) => {
 };
 
 /* ===================== TRADE HISTORY ===================== */
-const TradeHistory = ({ trades, onView, onClose, onDelete }) => {
+const TradeHistory = ({ trades, onView, onClose, onDelete, onJournal }) => {
   const [search, setSearch] = useState('');
   const [fType, setFType] = useState('all');
   const [fStatus, setFStatus] = useState('all');
@@ -1087,10 +1103,15 @@ const TradeHistory = ({ trades, onView, onClose, onDelete }) => {
                             平倉
                           </button>
                         )}
-                        <button onClick={() => onView(trade)} style={{ padding:7, borderRadius:7, background:'#334155', color:'#94a3b8', border:'none', display:'flex' }} className="action-btn">
+                        <button onClick={() => onView(trade)} style={{ padding:7, borderRadius:7, background:'#334155', color:'#94a3b8', border:'none', display:'flex' }} className="action-btn" title="查看詳情">
                           <Ico name="eye" size={14} />
                         </button>
-                        <button onClick={() => { if(window.confirm('確認刪除？')) onDelete(trade.id); }} style={{ padding:7, borderRadius:7, background:'#ef444420', color:'#f87171', border:'none', display:'flex' }} className="action-btn">
+                        {onJournal && (
+                          <button onClick={() => onJournal()} style={{ padding:7, borderRadius:7, background:'#1e3a5f', color:'#60a5fa', border:'none', display:'flex' }} className="action-btn" title="日誌心得">
+                            <Ico name="note" size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => { if(window.confirm('確認刪除？')) onDelete(trade.id); }} style={{ padding:7, borderRadius:7, background:'#ef444420', color:'#f87171', border:'none', display:'flex' }} className="action-btn" title="刪除">
                           <Ico name="trash" size={14} />
                         </button>
                       </div>
@@ -1379,7 +1400,7 @@ function App() {
                 <Ico name="plus" size={16} />新增
               </button>
             </div>
-            <TradeHistory trades={trades} onView={setViewTrade} onClose={doClose} onDelete={deleteTrade} />
+            <TradeHistory trades={trades} onView={setViewTrade} onClose={doClose} onDelete={deleteTrade} onJournal={() => setTab('journal')} />
           </div>
         ) : tab === 'journal' ? (
           <div className="fade-in">
