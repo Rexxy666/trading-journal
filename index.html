@@ -182,9 +182,42 @@ const SAMPLE = [
     entryPremium:2.00, exitPremium:0, openDate:'2026-06-12', closeDate:'2026-06-12', pnl:200,
     notes:'Covered call, ASSIGNED — 100 ADBE called away at $202.50. Premium $200 kept.', tags:['covered-call','assigned'], createdAt:'2026-06-12' },
 
-  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:125, expiry:'2026-09-18', contracts:1,
-    entryPremium:12.42, exitPremium:null, openDate:'2026-06-12', closeDate:null, pnl:0,
-    notes:'Long put on PLTR. Opened 6/12/2026.', tags:['long-put'], createdAt:'2026-06-12' },
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:125, expiry:'2026-09-18', contracts:1,
+    entryPremium:12.42, exitPremium:16.75, openDate:'2026-06-12', closeDate:'2026-06-24', pnl:433,
+    notes:'Long put on PLTR. BTO 6/12 @$12.42，STC 6/24 @$16.75. PnL = (16.75-12.42)×100 = +$433.', tags:['long-put'], createdAt:'2026-06-12' },
+
+  /* New option trades — June 2026 */
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'put', strike:205, expiry:'2026-09-18', contracts:1,
+    entryPremium:14.60, exitPremium:16.83, openDate:'2026-06-15', closeDate:'2026-06-24', pnl:223,
+    notes:'Long put NVDA 09/18 $205. BTO 6/15 @$14.60 (UNSOLICITED open)，STC 6/24 @$16.83. PnL = +$223.', tags:['long-put','NVDA'], createdAt:'2026-06-15' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:115, expiry:'2026-09-18', contracts:1,
+    entryPremium:11.00, exitPremium:15.95, openDate:'2026-06-24', closeDate:'2026-06-25', pnl:495,
+    notes:'Long put PLTR 09/18 $115. BTO 6/24 @$11.00，STC 6/25 @$15.95 次日即出場. PnL = +$495.', tags:['long-put','PLTR'], createdAt:'2026-06-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'NVDA', optionType:'call', strike:205, expiry:'2026-06-26', contracts:1,
+    entryPremium:1.10, exitPremium:0.47, openDate:'2026-06-24', closeDate:'2026-06-25', pnl:-63,
+    notes:'Long call NVDA 06/26 $205. BTO 6/24 @$1.10，STC 6/25 @$0.47 次日止損出場. PnL = -$63.', tags:['long-call','NVDA','short-dated'], createdAt:'2026-06-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:118, expiry:'2026-06-26', contracts:1,
+    entryPremium:1.46, exitPremium:null, openDate:'2026-06-24', closeDate:null, pnl:0,
+    notes:'Long call PLTR 06/26 $118. BTO 6/24 @$1.46. 今日(6/26)到期，請確認是否結算。', tags:['long-call','PLTR','short-dated'], createdAt:'2026-06-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'NVDA', optionType:'put', strike:195, expiry:'2026-09-18', contracts:1,
+    entryPremium:11.93, exitPremium:null, openDate:'2026-06-24', closeDate:null, pnl:0,
+    notes:'Long put NVDA 09/18 $195. BTO 6/24 @$11.93. 從 $205 Put 往下滾到 $195 strike.', tags:['long-put','NVDA'], createdAt:'2026-06-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:100, expiry:'2026-09-18', contracts:1,
+    entryPremium:7.90, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
+    notes:'Long put PLTR 09/18 $100. BTO 6/25 @$7.90. 從 $115 Put 往下滾到 $100 strike.', tags:['long-put','PLTR'], createdAt:'2026-06-25' },
+
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:125, expiry:'2026-07-02', contracts:1,
+    entryPremium:4.25, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
+    notes:'CSP INTC 07/02 $125 Put. STO 6/25 @$4.25，收取 $424.97 premium. 短週期 cash-secured put.', tags:['CSP','INTC','short-dated'], createdAt:'2026-06-25' },
+
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:110, expiry:'2026-09-18', contracts:1,
+    entryPremium:12.75, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
+    notes:'Long put INTC 09/18 $110. BTO 6/25 @$12.75. 與 07/02 $125 CSP 搭配，作為下跌保護或 diagonal spread.', tags:['long-put','INTC'], createdAt:'2026-06-25' },
 
   /* ========== STOCK TRADES ========== */
   /* NVDA Round 1: Long → Called away at $180 */
@@ -245,13 +278,13 @@ const SAMPLE = [
     shares:100, entryPrice:246.26, exitPrice:202.50, entryDate:'2026-06-08', exitDate:'2026-06-12',
     pnl:-4376, notes:'Accumulated 100 ADBE on 6/8 across 5 orders: 10@246, 10@245.65, 10@245, 50@246.50, 20@246.74. Avg $246.26. Stock called away at $202.50 via covered call assignment on 6/12. Stock loss: -$4,376. Combined with $200 call premium → net -$4,176.', tags:['swing','covered-call','assignment'], createdAt:'2026-06-08' },
 
-  { id:genId(), type:'stock', status:'open', ticker:'SPCX', direction:'long',
-    shares:10, entryPrice:167.00, exitPrice:null, entryDate:'2026-06-12', exitDate:null,
-    pnl:0, notes:'Bought 10 SPCX on 6/12.', tags:[], createdAt:'2026-06-12' },
+  { id:genId(), type:'stock', status:'closed', ticker:'SPCX', direction:'long',
+    shares:10, entryPrice:167.00, exitPrice:190.60, entryDate:'2026-06-12', exitDate:'2026-06-16',
+    pnl:236, notes:'Long 10 SPCX @$167.00 (6/12). 分批賣出：6/15 賣 5 股 @$175.00、6/16 賣 5 股 @$206.20。加權均價 $190.60。PnL = (190.60-167)×10 = +$236.', tags:['swing'], createdAt:'2026-06-12' },
 ];
 
 /* ===================== STORAGE ===================== */
-const STORAGE_KEY = 'trading-journal-v4';
+const STORAGE_KEY = 'trading-journal-v5';
 const loadTrades = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
