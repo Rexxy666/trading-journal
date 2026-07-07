@@ -223,6 +223,10 @@ const SAMPLE = [
     entryPremium:3.00, exitPremium:null, openDate:'2026-07-06', closeDate:null, pnl:0,
     notes:'CSP INTC 07/10 $120 Put. STO 7/6 @$3.00（UNSOLICITED，broker 從 $108 滾至 $120）. 持倉中。', tags:['CSP','INTC','short-dated','auto-roll'], createdAt:'2026-07-06' },
 
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-10', contracts:1,
+    entryPremium:1.23, exitPremium:null, openDate:'2026-07-07', closeDate:null, pnl:0,
+    notes:'CSP INTC 07/10 $100 Put. STO 7/7 @$1.23，收取 $123 premium. 與 $120 CSP 同週到期，雙 CSP 佈局。', tags:['CSP','INTC','short-dated'], createdAt:'2026-07-07' },
+
   { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:105, expiry:'2026-09-18', contracts:1,
     entryPremium:6.70, exitPremium:null, openDate:'2026-06-29', closeDate:null, pnl:0,
     notes:'Long put PLTR 09/18 $105. BTO 6/29 @$6.70. 與 $100 Put 合計持有兩張 PLTR long put.', tags:['long-put','PLTR'], createdAt:'2026-06-29' },
@@ -296,7 +300,7 @@ const SAMPLE = [
 ];
 
 /* ===================== STORAGE ===================== */
-const STORAGE_KEY = 'trading-journal-v6';
+const STORAGE_KEY = 'trading-journal-v7';
 const loadTrades = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
