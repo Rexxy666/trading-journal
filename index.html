@@ -199,9 +199,9 @@ const SAMPLE = [
     entryPremium:1.10, exitPremium:0.47, openDate:'2026-06-24', closeDate:'2026-06-25', pnl:-63,
     notes:'Long call NVDA 06/26 $205. BTO 6/24 @$1.10，STC 6/25 @$0.47 次日止損出場. PnL = -$63.', tags:['long-call','NVDA','short-dated'], createdAt:'2026-06-24' },
 
-  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:118, expiry:'2026-06-26', contracts:1,
-    entryPremium:1.46, exitPremium:null, openDate:'2026-06-24', closeDate:null, pnl:0,
-    notes:'Long call PLTR 06/26 $118. BTO 6/24 @$1.46. 今日(6/26)到期，請確認是否結算。', tags:['long-call','PLTR','short-dated'], createdAt:'2026-06-24' },
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'call', strike:118, expiry:'2026-06-26', contracts:1,
+    entryPremium:1.46, exitPremium:0.04, openDate:'2026-06-24', closeDate:'2026-06-26', pnl:-142,
+    notes:'Long call PLTR 06/26 $118. BTO 6/24 @$1.46，STC 6/26 @$0.04 近乎到期歸零. PnL = -$142.', tags:['long-call','PLTR','short-dated'], createdAt:'2026-06-24' },
 
   { id:genId(), type:'option', status:'open', ticker:'NVDA', optionType:'put', strike:195, expiry:'2026-09-18', contracts:1,
     entryPremium:11.93, exitPremium:null, openDate:'2026-06-24', closeDate:null, pnl:0,
@@ -211,9 +211,21 @@ const SAMPLE = [
     entryPremium:7.90, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
     notes:'Long put PLTR 09/18 $100. BTO 6/25 @$7.90. 從 $115 Put 往下滾到 $100 strike.', tags:['long-put','PLTR'], createdAt:'2026-06-25' },
 
-  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:125, expiry:'2026-07-02', contracts:1,
-    entryPremium:4.25, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
-    notes:'CSP INTC 07/02 $125 Put. STO 6/25 @$4.25，收取 $424.97 premium. 短週期 cash-secured put.', tags:['CSP','INTC','short-dated'], createdAt:'2026-06-25' },
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:125, expiry:'2026-07-02', contracts:1,
+    entryPremium:4.25, exitPremium:0.73, openDate:'2026-06-25', closeDate:'2026-06-30', pnl:352,
+    notes:'CSP INTC 07/02 $125 Put. STO 6/25 @$4.25，BTC 6/30 @$0.73（到期前 2 天提早結清）. PnL = +$352.', tags:['CSP','INTC','short-dated'], createdAt:'2026-06-25' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:108, expiry:'2026-07-10', contracts:1,
+    entryPremium:2.15, exitPremium:0.80, openDate:'2026-07-02', closeDate:'2026-07-06', pnl:135,
+    notes:'CSP INTC 07/10 $108 Put. STO 7/2 @$2.15（UNSOLICITED，broker 自動滾倉），BTC 7/6 @$0.80. PnL = +$135.', tags:['CSP','INTC','short-dated','auto-roll'], createdAt:'2026-07-02' },
+
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:120, expiry:'2026-07-10', contracts:1,
+    entryPremium:3.00, exitPremium:null, openDate:'2026-07-06', closeDate:null, pnl:0,
+    notes:'CSP INTC 07/10 $120 Put. STO 7/6 @$3.00（UNSOLICITED，broker 從 $108 滾至 $120）. 持倉中。', tags:['CSP','INTC','short-dated','auto-roll'], createdAt:'2026-07-06' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:105, expiry:'2026-09-18', contracts:1,
+    entryPremium:6.70, exitPremium:null, openDate:'2026-06-29', closeDate:null, pnl:0,
+    notes:'Long put PLTR 09/18 $105. BTO 6/29 @$6.70. 與 $100 Put 合計持有兩張 PLTR long put.', tags:['long-put','PLTR'], createdAt:'2026-06-29' },
 
   { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:110, expiry:'2026-09-18', contracts:1,
     entryPremium:12.75, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
@@ -284,7 +296,7 @@ const SAMPLE = [
 ];
 
 /* ===================== STORAGE ===================== */
-const STORAGE_KEY = 'trading-journal-v5';
+const STORAGE_KEY = 'trading-journal-v6';
 const loadTrades = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
