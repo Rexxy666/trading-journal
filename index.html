@@ -219,21 +219,21 @@ const SAMPLE = [
     entryPremium:2.15, exitPremium:0.80, openDate:'2026-07-02', closeDate:'2026-07-06', pnl:135,
     notes:'CSP INTC 07/10 $108 Put. STO 7/2 @$2.15（UNSOLICITED，broker 自動滾倉），BTC 7/6 @$0.80. PnL = +$135.', tags:['CSP','INTC','short-dated','auto-roll'], createdAt:'2026-07-02' },
 
-  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:120, expiry:'2026-07-10', contracts:1,
-    entryPremium:3.00, exitPremium:null, openDate:'2026-07-06', closeDate:null, pnl:0,
-    notes:'CSP INTC 07/10 $120 Put. STO 7/6 @$3.00（UNSOLICITED，broker 從 $108 滾至 $120）. 持倉中。', tags:['CSP','INTC','short-dated','auto-roll'], createdAt:'2026-07-06' },
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:120, expiry:'2026-07-10', contracts:1,
+    entryPremium:3.00, exitPremium:0, openDate:'2026-07-06', closeDate:'2026-07-10', pnl:300,
+    notes:'CSP INTC 07/10 $120 Put. STO 7/6 @$3.00，07/10 到期 INTC 跌破 $120 被 ASSIGN，接 100 股 @$120。Premium $300 保留。', tags:['CSP','INTC','short-dated','auto-roll','assigned'], createdAt:'2026-07-06' },
 
-  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-10', contracts:1,
-    entryPremium:1.23, exitPremium:null, openDate:'2026-07-07', closeDate:null, pnl:0,
-    notes:'CSP INTC 07/10 $100 Put. STO 7/7 @$1.23，收取 $123 premium. 與 $120 CSP 同週到期，雙 CSP 佈局。', tags:['CSP','INTC','short-dated'], createdAt:'2026-07-07' },
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-10', contracts:1,
+    entryPremium:1.23, exitPremium:0, openDate:'2026-07-07', closeDate:'2026-07-10', pnl:123,
+    notes:'CSP INTC 07/10 $100 Put. STO 7/7 @$1.23，07/10 到期 INTC 收在 $100 以上，OTM 到期，保留 premium $123。', tags:['CSP','INTC','short-dated'], createdAt:'2026-07-07' },
 
   { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:105, expiry:'2026-09-18', contracts:1,
     entryPremium:6.70, exitPremium:null, openDate:'2026-06-29', closeDate:null, pnl:0,
     notes:'Long put PLTR 09/18 $105. BTO 6/29 @$6.70. 與 $100 Put 合計持有兩張 PLTR long put.', tags:['long-put','PLTR'], createdAt:'2026-06-29' },
 
-  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:110, expiry:'2026-09-18', contracts:1,
-    entryPremium:12.75, exitPremium:null, openDate:'2026-06-25', closeDate:null, pnl:0,
-    notes:'Long put INTC 09/18 $110. BTO 6/25 @$12.75. 與 07/02 $125 CSP 搭配，作為下跌保護或 diagonal spread.', tags:['long-put','INTC'], createdAt:'2026-06-25' },
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:110, expiry:'2026-09-18', contracts:1,
+    entryPremium:12.75, exitPremium:23.85, openDate:'2026-06-25', closeDate:'2026-07-17', pnl:1110,
+    notes:'Long put INTC 09/18 $110. BTO 6/25 @$12.75，INTC 大跌後 STC 7/17 @$23.85（UNSOLICITED CLOSING）。PnL = +$1,110。', tags:['long-put','INTC'], createdAt:'2026-06-25' },
 
   /* ========== STOCK TRADES ========== */
   /* NVDA Round 1: Long → Called away at $180 */
@@ -297,10 +297,96 @@ const SAMPLE = [
   { id:genId(), type:'stock', status:'closed', ticker:'SPCX', direction:'long',
     shares:10, entryPrice:167.00, exitPrice:190.60, entryDate:'2026-06-12', exitDate:'2026-06-16',
     pnl:236, notes:'Long 10 SPCX @$167.00 (6/12). 分批賣出：6/15 賣 5 股 @$175.00、6/16 賣 5 股 @$206.20。加權均價 $190.60。PnL = (190.60-167)×10 = +$236.', tags:['swing'], createdAt:'2026-06-12' },
+
+  /* ========== INTC TRADES — July 2026 ========== */
+  { id:genId(), type:'stock', status:'closed', ticker:'INTC', direction:'long',
+    shares:100, entryPrice:120.00, exitPrice:107.00, entryDate:'2026-07-10', exitDate:'2026-07-14',
+    pnl:-1300, notes:'INTC 100 股由 $120 CSP 被 Assign（07/10 到期 INTC 跌破 $120）。週一 07/14 市價約 $107 賣出。股票損失 -$1,300，扣除所有 INTC CSP Premium +$910，合計 INTC 持股淨損 -$390。', tags:['assignment','INTC'], createdAt:'2026-07-10' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:105, expiry:'2026-07-17', contracts:1,
+    entryPremium:2.15, exitPremium:10.73, openDate:'2026-07-15', closeDate:'2026-07-17', pnl:-858,
+    notes:'CSP INTC 07/17 $105 Put（UNSOLICITED OPEN 7/15）。STO @$2.15，INTC 兩天內急跌，BTC 7/17 @$10.73 大虧。PnL = -$858。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-15' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:95, expiry:'2026-07-31', contracts:1,
+    entryPremium:6.50, exitPremium:11.57, openDate:'2026-07-20', closeDate:'2026-07-28', pnl:507,
+    notes:'Long put INTC 07/31 $95（UNSOLICITED OPEN 7/20）。BTO @$6.50，STC 7/28 @$11.57，INTC 持續下跌。PnL = +$507。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-20' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:85, expiry:'2026-07-31', contracts:1,
+    entryPremium:2.95, exitPremium:4.02, openDate:'2026-07-20', closeDate:'2026-07-28', pnl:-107,
+    notes:'CSP INTC 07/31 $85 Put（UNSOLICITED OPEN 7/20）。STO @$2.95，BTC 7/28 @$4.02。PnL = -$107。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-20' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-31', contracts:1,
+    entryPremium:7.48, exitPremium:14.00, openDate:'2026-07-21', closeDate:'2026-07-28', pnl:652,
+    notes:'Long put INTC 07/31 $100（UNSOLICITED OPEN 7/21）。BTO @$7.48，STC 7/28 @$14.00，INTC 跌深獲利。PnL = +$652。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-21' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:90, expiry:'2026-07-31', contracts:1,
+    entryPremium:3.58, exitPremium:5.30, openDate:'2026-07-21', closeDate:'2026-07-27', pnl:-172,
+    notes:'CSP INTC 07/31 $90 Put（UNSOLICITED OPEN 7/21）。STO @$3.58，BTC 7/27 @$5.30。PnL = -$172。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-21' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:90, expiry:'2026-07-24', contracts:2,
+    entryPremium:1.52, exitPremium:0.11, openDate:'2026-07-23', closeDate:'2026-07-24', pnl:282,
+    notes:'CSP INTC 07/24 $90 Put × 2 張（UNSOLICITED OPEN 7/23）。STO @$1.52，BTC 7/24 @$0.11 次日快速結清。PnL = +$282。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-23' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-24', contracts:2,
+    entryPremium:5.15, exitPremium:4.15, openDate:'2026-07-23', closeDate:'2026-07-24', pnl:-200,
+    notes:'Long put INTC 07/24 $100 × 2 張（UNSOLICITED OPEN 7/23）。BTO @$5.15，分批 STC 7/24 @$4.80 + @$3.50，avg exit $4.15。PnL = -$200。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-23' },
+
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:95, expiry:'2026-09-18', contracts:1,
+    entryPremium:13.50, exitPremium:null, openDate:'2026-07-17', closeDate:null, pnl:0,
+    notes:'Long put INTC 09/18 $95（UNSOLICITED OPEN 7/17）。BTO @$13.50，替換 $110 Put 繼續看空 INTC。持倉中。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-17' },
+
+  { id:genId(), type:'option', status:'open', ticker:'INTC', optionType:'put', strike:75, expiry:'2026-09-18', contracts:1,
+    entryPremium:6.30, exitPremium:null, openDate:'2026-07-29', closeDate:null, pnl:0,
+    notes:'CSP INTC 09/18 $75 Put（UNSOLICITED OPEN 7/29）。STO @$6.30，INTC 持續下跌背景下收 premium。持倉中。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-29' },
+
+  /* ========== PLTR TRADES — July 2026 (Broker UNSOLICITED Rolls) ========== */
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:122, expiry:'2026-07-31', contracts:1,
+    entryPremium:2.55, exitPremium:1.29, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:126,
+    notes:'CSP PLTR 07/31 $122 Put（UNSOLICITED OPEN 7/24）。STO @$2.55，BTC 7/31 @$1.29。PnL = +$126。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:121, expiry:'2026-07-31', contracts:1,
+    entryPremium:2.22, exitPremium:0.57, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:165,
+    notes:'CSP PLTR 07/31 $121 Put（UNSOLICITED OPEN 7/24）。STO @$2.22，BTC 7/31 @$0.57。PnL = +$165。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'call', strike:124, expiry:'2026-07-31', contracts:1,
+    entryPremium:3.48, exitPremium:0.04, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:344,
+    notes:'Short call PLTR 07/31 $124（UNSOLICITED OPEN 7/24）。STO @$3.48，BTC 7/31 @$0.04 近到期歸零。PnL = +$344。', tags:['short-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:118, expiry:'2026-07-31', contracts:1,
+    entryPremium:1.34, exitPremium:0.03, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-131,
+    notes:'Long put PLTR 07/31 $118（UNSOLICITED OPEN 7/24）。BTO @$1.34，STC 7/31 @$0.03 到期近零。PnL = -$131。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:119, expiry:'2026-07-31', contracts:1,
+    entryPremium:1.55, exitPremium:0.10, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-145,
+    notes:'Long put PLTR 07/31 $119（UNSOLICITED OPEN 7/24）。BTO @$1.55，STC 7/31 @$0.10。PnL = -$145。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'call', strike:127, expiry:'2026-07-31', contracts:1,
+    entryPremium:2.16, exitPremium:0.01, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-215,
+    notes:'Long call PLTR 07/31 $127（UNSOLICITED OPEN 7/24）。BTO @$2.16，STC 7/31 @$0.01 到期近零。PnL = -$215。', tags:['long-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:122, expiry:'2026-08-07', contracts:1,
+    entryPremium:6.55, exitPremium:7.80, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:125,
+    notes:'Long put PLTR 08/07 $122（UNSOLICITED OPEN 7/24）。BTO @$6.55，提前 STC 7/31 @$7.80 獲利出場。PnL = +$125。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:115, expiry:'2026-08-07', contracts:1,
+    entryPremium:3.70, exitPremium:4.40, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-70,
+    notes:'CSP PLTR 08/07 $115 Put（UNSOLICITED OPEN 7/24）。STO @$3.70，BTC 7/31 @$4.40。PnL = -$70。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:122, expiry:'2026-08-07', contracts:1,
+    entryPremium:8.50, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
+    notes:'Short call PLTR 08/07 $122（UNSOLICITED OPEN 7/24）。STO @$8.50。PLTR 漲至 $134，此 Call 深度 ITM（-$12），08/07 到期風險高，可能被 Call 走。持倉中。', tags:['short-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:140, expiry:'2026-08-07', contracts:1,
+    entryPremium:2.33, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
+    notes:'Long call PLTR 08/07 $140（UNSOLICITED OPEN 7/24）。BTO @$2.33，與 $122 Short Call 配對作 Call Spread。PLTR 需漲破 $140 才有獲利。持倉中。', tags:['long-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:110, expiry:'2026-08-07', contracts:1,
+    entryPremium:2.30, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
+    notes:'CSP PLTR 08/07 $110 Put（UNSOLICITED OPEN 7/24）。STO @$2.30，PLTR 在 $134，目前 OTM 安全，到期可收 $230 premium。持倉中。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
 ];
 
 /* ===================== STORAGE ===================== */
-const STORAGE_KEY = 'trading-journal-v7';
+const STORAGE_KEY = 'trading-journal-v8';
 const loadTrades = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
