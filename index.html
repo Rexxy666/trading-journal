@@ -309,19 +309,19 @@ const SAMPLE = [
 
   { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:95, expiry:'2026-07-31', contracts:1,
     entryPremium:6.50, exitPremium:11.57, openDate:'2026-07-20', closeDate:'2026-07-28', pnl:507,
-    notes:'Long put INTC 07/31 $95（UNSOLICITED OPEN 7/20）。BTO @$6.50，STC 7/28 @$11.57，INTC 持續下跌。PnL = +$507。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-20' },
+    notes:'Bear Put Spread #1 上腳（Long Put）。BTO INTC 07/31 $95 Put（UNSOLICITED OPEN 7/20）。BTO @$6.50，STC 7/28 @$11.57，INTC 持續下跌獲利。與 $85 CSP 組成 Bear Put Spread（利潤區間 $85–$95）。PnL = +$507。', tags:['long-put','INTC','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-20' },
 
   { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:85, expiry:'2026-07-31', contracts:1,
     entryPremium:2.95, exitPremium:4.02, openDate:'2026-07-20', closeDate:'2026-07-28', pnl:-107,
-    notes:'CSP INTC 07/31 $85 Put（UNSOLICITED OPEN 7/20）。STO @$2.95，BTC 7/28 @$4.02。PnL = -$107。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-20' },
+    notes:'Bear Put Spread #1 下腳（Short Put）。STO INTC 07/31 $85 CSP（UNSOLICITED OPEN 7/20）。STO @$2.95，BTC 7/28 @$4.02 提前平倉。與 $95 Long Put 組成 Bear Put Spread，限制下行風險。PnL = -$107。', tags:['CSP','INTC','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-20' },
 
   { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:100, expiry:'2026-07-31', contracts:1,
     entryPremium:7.48, exitPremium:14.00, openDate:'2026-07-21', closeDate:'2026-07-28', pnl:652,
-    notes:'Long put INTC 07/31 $100（UNSOLICITED OPEN 7/21）。BTO @$7.48，STC 7/28 @$14.00，INTC 跌深獲利。PnL = +$652。', tags:['long-put','INTC','UNSOLICITED'], createdAt:'2026-07-21' },
+    notes:'Bear Put Spread #2 上腳（Long Put）。BTO INTC 07/31 $100 Put（UNSOLICITED OPEN 7/21）。BTO @$7.48，STC 7/28 @$14.00，INTC 大跌獲利豐。與 $90 CSP 組成 Bear Put Spread（利潤區間 $90–$100）。PnL = +$652。', tags:['long-put','INTC','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-21' },
 
   { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:90, expiry:'2026-07-31', contracts:1,
     entryPremium:3.58, exitPremium:5.30, openDate:'2026-07-21', closeDate:'2026-07-27', pnl:-172,
-    notes:'CSP INTC 07/31 $90 Put（UNSOLICITED OPEN 7/21）。STO @$3.58，BTC 7/27 @$5.30。PnL = -$172。', tags:['CSP','INTC','UNSOLICITED'], createdAt:'2026-07-21' },
+    notes:'Bear Put Spread #2 下腳（Short Put）。STO INTC 07/31 $90 CSP（UNSOLICITED OPEN 7/21）。STO @$3.58，BTC 7/27 @$5.30 提前平倉。與 $100 Long Put 組成 Bear Put Spread，限制下行風險。PnL = -$172。', tags:['CSP','INTC','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-21' },
 
   { id:genId(), type:'option', status:'closed', ticker:'INTC', optionType:'put', strike:90, expiry:'2026-07-24', contracts:2,
     entryPremium:1.52, exitPremium:0.11, openDate:'2026-07-23', closeDate:'2026-07-24', pnl:282,
@@ -342,51 +342,56 @@ const SAMPLE = [
   /* ========== PLTR TRADES — July 2026 (Broker UNSOLICITED Rolls) ========== */
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:122, expiry:'2026-07-31', contracts:1,
     entryPremium:2.55, exitPremium:1.29, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:126,
-    notes:'CSP PLTR 07/31 $122 Put（UNSOLICITED OPEN 7/24）。STO @$2.55，BTC 7/31 @$1.29。PnL = +$126。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor B 第1腳（Short Put）。CSP PLTR 07/31 $122 Put（UNSOLICITED OPEN 7/24）。STO @$2.55，BTC 7/31 @$1.29。與 $119 Long Put + $125 Short Call + $128 Long Call 組成 IC-B。PnL = +$126。', tags:['CSP','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:121, expiry:'2026-07-31', contracts:1,
     entryPremium:2.22, exitPremium:0.57, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:165,
-    notes:'CSP PLTR 07/31 $121 Put（UNSOLICITED OPEN 7/24）。STO @$2.22，BTC 7/31 @$0.57。PnL = +$165。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor A 第1腳（Short Put）。CSP PLTR 07/31 $121 Put（UNSOLICITED OPEN 7/24）。STO @$2.22，BTC 7/31 @$0.57。與 $118 Long Put + $124 Short Call + $127 Long Call 組成 IC-A（利潤區間 $121–$124）。PnL = +$165。', tags:['CSP','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'call', strike:124, expiry:'2026-07-31', contracts:1,
     entryPremium:3.48, exitPremium:0.04, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:344,
-    notes:'Short call PLTR 07/31 $124（UNSOLICITED OPEN 7/24）。STO @$3.48，BTC 7/31 @$0.04 近到期歸零。PnL = +$344。', tags:['short-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor A 第2腳（Short Call）。STO PLTR 07/31 $124 Call（UNSOLICITED OPEN 7/24）。STO @$3.48，BTC 7/31 @$0.04 近到期歸零。與 $121 Short Put + $118 Long Put + $127 Long Call 組成 IC-A。PnL = +$344。', tags:['short-call','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:118, expiry:'2026-07-31', contracts:1,
     entryPremium:1.34, exitPremium:0.03, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-131,
-    notes:'Long put PLTR 07/31 $118（UNSOLICITED OPEN 7/24）。BTO @$1.34，STC 7/31 @$0.03 到期近零。PnL = -$131。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor A 第3腳（Long Put 保護腳）。BTO PLTR 07/31 $118 Put（UNSOLICITED OPEN 7/24）。BTO @$1.34，STC 7/31 @$0.03 到期近零。與 $121 Short Put 組成下翼 Bull Put Spread，限制下行風險。PnL = -$131。', tags:['long-put','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:119, expiry:'2026-07-31', contracts:1,
     entryPremium:1.55, exitPremium:0.10, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-145,
-    notes:'Long put PLTR 07/31 $119（UNSOLICITED OPEN 7/24）。BTO @$1.55，STC 7/31 @$0.10。PnL = -$145。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor B 第2腳（Long Put 保護腳）。BTO PLTR 07/31 $119 Put（UNSOLICITED OPEN 7/24）。BTO @$1.55，STC 7/31 @$0.10。與 $122 Short Put 組成下翼 Bull Put Spread（IC-B）。PnL = -$145。', tags:['long-put','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'call', strike:127, expiry:'2026-07-31', contracts:1,
     entryPremium:2.16, exitPremium:0.01, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-215,
-    notes:'Long call PLTR 07/31 $127（UNSOLICITED OPEN 7/24）。BTO @$2.16，STC 7/31 @$0.01 到期近零。PnL = -$215。', tags:['long-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Iron Condor A 第4腳（Long Call 保護腳）。BTO PLTR 07/31 $127 Call（UNSOLICITED OPEN 7/24）。BTO @$2.16，STC 7/31 @$0.01 到期近零。與 $124 Short Call 組成上翼 Bear Call Spread，限制上行風險。PnL = -$215。', tags:['long-call','PLTR','UNSOLICITED','iron-condor'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:122, expiry:'2026-08-07', contracts:1,
     entryPremium:6.55, exitPremium:7.80, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:125,
-    notes:'Long put PLTR 08/07 $122（UNSOLICITED OPEN 7/24）。BTO @$6.55，提前 STC 7/31 @$7.80 獲利出場。PnL = +$125。', tags:['long-put','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Bear Put Spread 上腳（Long Put）。BTO PLTR 08/07 $122 Put（UNSOLICITED OPEN 7/24）。BTO @$6.55，提前 STC 7/31 @$7.80 獲利出場。與 $115 CSP 組成 Bear Put Spread，7/31 提前平倉。PnL = +$125。', tags:['long-put','PLTR','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'closed', ticker:'PLTR', optionType:'put', strike:115, expiry:'2026-08-07', contracts:1,
     entryPremium:3.70, exitPremium:4.40, openDate:'2026-07-24', closeDate:'2026-07-31', pnl:-70,
-    notes:'CSP PLTR 08/07 $115 Put（UNSOLICITED OPEN 7/24）。STO @$3.70，BTC 7/31 @$4.40。PnL = -$70。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Bear Put Spread 下腳（Short Put）。STO PLTR 08/07 $115 CSP（UNSOLICITED OPEN 7/24）。STO @$3.70，BTC 7/31 @$4.40。與 $122 Long Put 組成 Bear Put Spread，7/31 提前平倉。PnL = -$70。', tags:['CSP','PLTR','UNSOLICITED','bear-put-spread'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:122, expiry:'2026-08-07', contracts:1,
     entryPremium:8.50, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
-    notes:'Short call PLTR 08/07 $122（UNSOLICITED OPEN 7/24）。STO @$8.50。PLTR 漲至 $134，此 Call 深度 ITM（-$12），08/07 到期風險高，可能被 Call 走。持倉中。', tags:['short-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Bearish Combo 第1腳（Short Call）。STO PLTR 08/07 $122 Call（UNSOLICITED OPEN 7/24）。STO @$8.50。PLTR 漲至 $134，此 Call 深度 ITM（-$12），08/07 到期風險高。與 $140 Long Call + $110 CSP + $122 Long Put 組成 Bearish Combo 策略。持倉中 ⚠️。', tags:['short-call','PLTR','UNSOLICITED','bearish-combo'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'call', strike:140, expiry:'2026-08-07', contracts:1,
     entryPremium:2.33, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
-    notes:'Long call PLTR 08/07 $140（UNSOLICITED OPEN 7/24）。BTO @$2.33，與 $122 Short Call 配對作 Call Spread。PLTR 需漲破 $140 才有獲利。持倉中。', tags:['long-call','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Bearish Combo 第2腳（Long Call 保護腳）。BTO PLTR 08/07 $140 Call（UNSOLICITED OPEN 7/24）。BTO @$2.33，上行保護腳：限制 $122 Short Call 在 PLTR 超漲時的損失上限（最大損失區間 $122–$140）。持倉中。', tags:['long-call','PLTR','UNSOLICITED','bearish-combo'], createdAt:'2026-07-24' },
 
   { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:110, expiry:'2026-08-07', contracts:1,
     entryPremium:2.30, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
-    notes:'CSP PLTR 08/07 $110 Put（UNSOLICITED OPEN 7/24）。STO @$2.30，PLTR 在 $134，目前 OTM 安全，到期可收 $230 premium。持倉中。', tags:['CSP','PLTR','UNSOLICITED'], createdAt:'2026-07-24' },
+    notes:'Bearish Combo 第3腳（Short Put 收益腳）。STO PLTR 08/07 $110 CSP（UNSOLICITED OPEN 7/24）。STO @$2.30，PLTR 在 $134，OTM 安全，額外收 $230 premium。與 $122 Short Call + $140 Long Call + $122 Long Put 組成 Bearish Combo。持倉中。', tags:['CSP','PLTR','UNSOLICITED','bearish-combo'], createdAt:'2026-07-24' },
+
+  { id:genId(), type:'option', status:'open', ticker:'PLTR', optionType:'put', strike:122, expiry:'2026-08-07', contracts:1,
+    entryPremium:6.53, exitPremium:null, openDate:'2026-07-24', closeDate:null, pnl:0,
+    notes:'Bearish Combo 第4腳（Long Put 核心腳）。BTO PLTR 08/07 $122 Put（用戶自建）。BTO @$6.53。與 $122 Short Call 組成 Synthetic Short（在 $122 附近做空 PLTR）；與 $140 Long Call + $110 CSP 共四腳構成完整 Bearish Combo 策略。持倉中，08/07 到期。', tags:['long-put','PLTR','bearish-combo'], createdAt:'2026-07-24' },
+
 ];
 
 /* ===================== STORAGE ===================== */
-const STORAGE_KEY = 'trading-journal-v8';
+const STORAGE_KEY = 'trading-journal-v9';
 const loadTrades = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
